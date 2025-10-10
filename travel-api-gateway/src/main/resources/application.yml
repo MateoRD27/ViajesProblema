@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: travel-api-gateway
+  data:
+    redis:
+      name: redis-cache
+      host: localhost
+      port: 6379
+
+  cloud:
+    discovery:
+      enabled: true
+    gateway:
+      default-filters:
+        -name: RequestRatelimiter
+        args:
+          redis-rate-limiter.replenishRate: 5   # peticiones por segundo
+          redis-rate-limiter.burstCapacity: 10
+          key-resolver: "#{@apiKeyResolver}"
+      server:
+        webflux:
+          routes:
+            #Ruta itinerary service
+            - id: itinerary-service
+              uri: lb://ITINERARY-SERVICE
+              predicates:
+                - Path=/api/public/itinerary/**
+              filters:
+                - RewritePath=/api/public/itinerary/(?<segment>.*), /api/itinerary/v1/${segment}
+                - name: CircuitBreaker
+                  args:
+                    name: itineraryCB
+                    fallbackUri: forward:/fallback/itinerary
+
+            # RUTA BOOKING SERVICE
+            - id: booking-service
+              uri: lb://BOOKING-SERVICE
+              predicates:
+                - Path=/api/public/booking/**
+              filters:
+                - RewritePath=/api/public/booking/(?<segment>.*), /api/booking/v1/${segment}
+                - name: CircuitBreaker
+                  args:
+                    name: bookingCB
+                    fallbackUri: forward:/fallback/booking
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      itineraryCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+      bookingCB:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
