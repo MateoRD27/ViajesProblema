@@ -27,9 +27,9 @@ spring:
             - id: itinerary-service
               uri: lb://ITINERARY-SERVICE
               predicates:
-                - Path=/api/public/itinerary/**
+                - Path=/api/itinerary/**
               filters:
-                - RewritePath=/api/public/itinerary/(?<segment>.*), /api/itinerary/v1/${segment}
+                - RewritePath=/api/itinerary/(?<segment>.*), /api/itinerary/${segment}
                 - name: CircuitBreaker
                   args:
                     name: itineraryCB
@@ -39,9 +39,9 @@ spring:
             - id: booking-service
               uri: lb://BOOKING-SERVICE
               predicates:
-                - Path=/api/public/booking/**
+                - Path=/api/booking/**
               filters:
-                - RewritePath=/api/public/booking/(?<segment>.*), /api/booking/v1/${segment}
+                - RewritePath=/api/booking/(?<segment>.*), /api/booking/${segment}
                 - name: CircuitBreaker
                   args:
                     name: bookingCB
@@ -58,3 +58,10 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+
+eureka:
+  client:
+    service-url:
+        defaultZone: http://localhost:8761/eureka/
+    instance:
+        prefer-ip-address: true
