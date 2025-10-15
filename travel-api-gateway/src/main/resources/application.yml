@@ -9,7 +9,7 @@ spring:
     redis:
       host: redis
       port: 6379
-      name: redis-cache
+      timeout: 2000ms
 
   cloud:
     discovery:
@@ -17,36 +17,31 @@ spring:
 
     gateway:
       default-filters:
+        # Límite de peticiones por API key (rate limiter)
         - name: RequestRateLimiter
           args:
-            redis-rate-limiter.replenishRate: 5   # peticiones por segundo
-            redis-rate-limiter.burstCapacity: 10
-            key-resolver: "#{@apiKeyResolver}"    # resolver por API key
+            redis-rate-limiter.replenishRate: 5    # peticiones por segundo
+            redis-rate-limiter.burstCapacity: 10   # máximo acumulado
+            key-resolver: "#{@apiKeyResolver}"     # resolver de clave (debes tener un bean apiKeyResolver)
 
       routes:
-        # Ruta Itinerary Service
         - id: itinerary-service
           uri: lb://ITINERARY-SERVICE
           predicates:
             - Path=/api/public/itinerary/**
           filters:
-            # Reescribe la URL pública a la interna
             - RewritePath=/api/public/itinerary/(?<segment>.*), /api/itinerary/v1/${segment}
-            # Circuit breaker con fallback
             - name: CircuitBreaker
               args:
                 name: itineraryCB
                 fallbackUri: forward:/fallback/itinerary
 
-        # Ruta Booking Service
         - id: booking-service
           uri: lb://BOOKING-SERVICE
           predicates:
             - Path=/api/public/booking/**
           filters:
-            # Reescribe la URL pública a la interna
             - RewritePath=/api/public/booking/(?<segment>.*), /api/booking/v1/${segment}
-            # Circuit breaker con fallback
             - name: CircuitBreaker
               args:
                 name: bookingCB
@@ -63,6 +58,11 @@ resilience4j:
         slidingWindowSize: 10
         failureRateThreshold: 50
         waitDurationInOpenState: 10s
+
+gateway:
+  cache:
+    ttl-seconds: 60
+    paths: /api/public/itinerary/search
 
 eureka:
   client:
