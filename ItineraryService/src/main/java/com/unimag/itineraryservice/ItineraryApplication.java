@@ -7,10 +7,10 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
 @EnableDiscoveryClient
-public class ViajesApplication {
+public class ItineraryApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ViajesApplication.class, args);
+		SpringApplication.run(ItineraryApplication.class, args);
 	}
 
 }

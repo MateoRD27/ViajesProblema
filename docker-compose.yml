@@ -1,0 +1,124 @@
+version: "3.9"
+
+services:
+
+  maven-builder:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: maven-builder
+    working_dir: /app
+    volumes:
+      - .:/app
+      - maven-repo:/root/.m2
+    command: mvn -B dependency:go-offline
+    networks:
+      - travel-network
+
+  service-discovery:
+    build:
+      context: .
+      dockerfile: ./serviceDiscovery/Dockerfile
+    container_name: service-discovery
+    depends_on:
+      maven-builder:
+        condition: service_completed_successfully
+    ports:
+      - "8761:8761"
+    volumes:
+      - maven-repo:/root/.m2
+    networks:
+      - travel-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  itinerary-service:
+    build:
+      context: .
+      dockerfile: ./ItineraryService/Dockerfile
+    container_name: itinerary-service
+    depends_on:
+      maven-builder:
+        condition: service_completed_successfully
+      service-discovery:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-discovery:8761/eureka/
+    volumes:
+      - maven-repo:/root/.m2
+    networks:
+      - travel-network
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: ./bookingService/Dockerfile
+    container_name: booking-service
+    depends_on:
+      maven-builder:
+        condition: service_completed_successfully
+      service-discovery:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-discovery:8761/eureka/
+    volumes:
+      - maven-repo:/root/.m2
+    networks:
+      - travel-network
+
+  travel-api-gateway:
+    build:
+      context: .
+      dockerfile: ./travel-api-gateway/Dockerfile
+    container_name: travel-api-gateway
+    depends_on:
+      maven-builder:
+        condition: service_completed_successfully
+      service-discovery:
+        condition: service_healthy
+      itinerary-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-discovery:8761/eureka/
+      SPRING_REDIS_HOST: redis
+    volumes:
+      - maven-repo:/root/.m2
+    networks:
+      - travel-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - travel-network
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  travel-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  maven-repo:

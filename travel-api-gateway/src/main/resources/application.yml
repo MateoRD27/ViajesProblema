@@ -4,48 +4,53 @@ server:
 spring:
   application:
     name: travel-api-gateway
+
   data:
     redis:
-      name: redis-cache
-      host: localhost
+      host: redis
       port: 6379
+      name: redis-cache
 
   cloud:
     discovery:
       enabled: true
+
     gateway:
       default-filters:
-        -name: RequestRatelimiter
-        args:
-          redis-rate-limiter.replenishRate: 5   # peticiones por segundo
-          redis-rate-limiter.burstCapacity: 10
-          key-resolver: "#{@apiKeyResolver}"
-      server:
-        webflux:
-          routes:
-            #Ruta itinerary service
-            - id: itinerary-service
-              uri: lb://ITINERARY-SERVICE
-              predicates:
-                - Path=/api/itinerary/**
-              filters:
-                - RewritePath=/api/itinerary/(?<segment>.*), /api/itinerary/${segment}
-                - name: CircuitBreaker
-                  args:
-                    name: itineraryCB
-                    fallbackUri: forward:/fallback/itinerary
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 5   # peticiones por segundo
+            redis-rate-limiter.burstCapacity: 10
+            key-resolver: "#{@apiKeyResolver}"    # resolver por API key
 
-            # RUTA BOOKING SERVICE
-            - id: booking-service
-              uri: lb://BOOKING-SERVICE
-              predicates:
-                - Path=/api/booking/**
-              filters:
-                - RewritePath=/api/booking/(?<segment>.*), /api/booking/${segment}
-                - name: CircuitBreaker
-                  args:
-                    name: bookingCB
-                    fallbackUri: forward:/fallback/booking
+      routes:
+        # Ruta Itinerary Service
+        - id: itinerary-service
+          uri: lb://ITINERARY-SERVICE
+          predicates:
+            - Path=/api/public/itinerary/**
+          filters:
+            # Reescribe la URL pública a la interna
+            - RewritePath=/api/public/itinerary/(?<segment>.*), /api/itinerary/v1/${segment}
+            # Circuit breaker con fallback
+            - name: CircuitBreaker
+              args:
+                name: itineraryCB
+                fallbackUri: forward:/fallback/itinerary
+
+        # Ruta Booking Service
+        - id: booking-service
+          uri: lb://BOOKING-SERVICE
+          predicates:
+            - Path=/api/public/booking/**
+          filters:
+            # Reescribe la URL pública a la interna
+            - RewritePath=/api/public/booking/(?<segment>.*), /api/booking/v1/${segment}
+            # Circuit breaker con fallback
+            - name: CircuitBreaker
+              args:
+                name: bookingCB
+                fallbackUri: forward:/fallback/booking
 
 resilience4j:
   circuitbreaker:
@@ -62,6 +67,6 @@ resilience4j:
 eureka:
   client:
     service-url:
-        defaultZone: http://localhost:8761/eureka/
-    instance:
-        prefer-ip-address: true
+      defaultZone: http://service-discovery:8761/eureka/
+  instance:
+    prefer-ip-address: true
