@@ -1,4 +1,4 @@
-package com.unimag.viajes.ControllerItinerary;
+package com.unimag.itineraryservice.ControllerItinerary;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
